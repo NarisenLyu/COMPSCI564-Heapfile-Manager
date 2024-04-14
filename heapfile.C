@@ -1,7 +1,11 @@
 #include "heapfile.h"
 #include "error.h"
 
-// routine to create a heapfile
+/**
+ * This function creates an empty (well, almost empty) heap file
+ * @param fileName
+ * @return
+*/
 const Status createHeapFile(const string fileName)
 {
     File* 		file;
@@ -40,7 +44,11 @@ const Status destroyHeapFile(const string fileName)
 	return (db.destroyFile (fileName));
 }
 
-// constructor opens the underlying file
+/**
+ * This constructor opens the underlying file
+ * @param fileName The name of the file to be opened
+ * @param returnStatus A reference to a Status variable
+*/
 HeapFile::HeapFile(const string & fileName, Status& returnStatus)
 {
     Status 	status;
@@ -51,17 +59,28 @@ HeapFile::HeapFile(const string & fileName, Status& returnStatus)
     // open the file and read in the header page and the first data page
     if ((status = db.openFile(fileName, filePtr)) == OK)
     {
+		// Next, it reads and pins the header page for the file in the buffer pool, 
+        // initializing the private data members headerPage, headerPageNo, and hdrDirtyFlag
+        int firstPageNo;
+        Page* firstPage;
+        //returns via firstPageNo
+        filePtr->getFirstPage(firstPageNo);
+        //returns page via firstPage
+		bufMgr->readPage(filePtr,firstPageNo,firstPage);
+		headerPage = (FileHdrPage *) firstPage;
+		headerPageNo = firstPageNo;
+        //TODO: is it false? 
+		hdrDirtyFlag = false;
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+		// Finally, read and pin the first page of the file into the buffer pool, 
+        // initializing the values of curPage, curPageNo, and curDirtyFlag appropriately. 
+        // Set curRec to NULLRID.
+        curPageNo = headerPage->firstPage;
+        bufMgr->readPage(filePtr,curPageNo,curPage);
+        curDirtyFlag = false;
+        curRec = NULLRID;
+        returnStatus = status;
+		return;
     }
     else
     {
