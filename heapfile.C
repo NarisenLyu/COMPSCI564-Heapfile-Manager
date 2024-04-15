@@ -1,11 +1,7 @@
 #include "heapfile.h"
 #include "error.h"
 
-/**
- * This function creates an empty (well, almost empty) heap file
- * @param fileName
- * @return
-*/
+// routine to create a heapfile
 const Status createHeapFile(const string fileName)
 {
     File* 		file;
@@ -21,20 +17,36 @@ const Status createHeapFile(const string fileName)
     {
 		// file doesn't exist. First create it and allocate
 		// an empty header page and data page.
+		status = db.createFile(fileName); //create new file
+        db.openFile(fileName, file); // creates the file so I can call it
+		status = bufMgr->allocPage(file, hdrPageNo, newPage); //allocate an empty page in buffer pool
+
+        //Take the Page* pointer(newPage) returned from allocPage() and cast it to a FileHdrPage*
+        FileHdrPage* hdrPage = (FileHdrPage *) newPage;
+
+        // Then make a second call to bm->allocPage(). This page will be the first data page of the file. 
+        status = bufMgr->allocPage(file, hdrPageNo, newPage);
+        // Using the Page* pointer returned, invoke its init() method to initialize the page contents.
+        newPage->init(newPageNo);
+
+        // Finally, store the page number of the data page in firstPage and lastPage attributes of the FileHdrPage.
+        if (hdrPage != nullptr){
+            strcpy(hdrPage->fileName, fileName.c_str());
+            hdrPage->firstPage = newPageNo;
+            hdrPage->lastPage = newPageNo;
+            //record = 0
+            //page = 1
+        }
+        // When you have done all this unpin both pages and mark them as dirty.
+        bufMgr->unPinPage(file, newPageNo, false); 
+        bufMgr->unPinPage(file, hdrPageNo, false); 
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+		// flush and close file
+        bufMgr->flushFile(file);
+        db.closeFile(file);
+        return OK; // FIXME: what should I return?
     }
+
     return (FILEEXISTS);
 }
 
@@ -44,11 +56,7 @@ const Status destroyHeapFile(const string fileName)
 	return (db.destroyFile (fileName));
 }
 
-/**
- * This constructor opens the underlying file
- * @param fileName The name of the file to be opened
- * @param returnStatus A reference to a Status variable
-*/
+// constructor opens the underlying file
 HeapFile::HeapFile(const string & fileName, Status& returnStatus)
 {
     Status 	status;
@@ -59,28 +67,17 @@ HeapFile::HeapFile(const string & fileName, Status& returnStatus)
     // open the file and read in the header page and the first data page
     if ((status = db.openFile(fileName, filePtr)) == OK)
     {
-		// Next, it reads and pins the header page for the file in the buffer pool, 
-        // initializing the private data members headerPage, headerPageNo, and hdrDirtyFlag
-        int firstPageNo;
-        Page* firstPage;
-        //returns via firstPageNo
-        filePtr->getFirstPage(firstPageNo);
-        //returns page via firstPage
-		bufMgr->readPage(filePtr,firstPageNo,firstPage);
-		headerPage = (FileHdrPage *) firstPage;
-		headerPageNo = firstPageNo;
-        //TODO: is it false? 
-		hdrDirtyFlag = false;
 		
-		// Finally, read and pin the first page of the file into the buffer pool, 
-        // initializing the values of curPage, curPageNo, and curDirtyFlag appropriately. 
-        // Set curRec to NULLRID.
-        curPageNo = headerPage->firstPage;
-        bufMgr->readPage(filePtr,curPageNo,curPage);
-        curDirtyFlag = false;
-        curRec = NULLRID;
-        returnStatus = status;
-		return;
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
     }
     else
     {
@@ -137,54 +134,7 @@ const int HeapFile::getRecCnt() const
 const Status HeapFile::getRecord(const RID & rid, Record & rec)
 {
     Status status;
-    // check if curPage is NULL. 
-    // If yes, read the right page (the one with the requested record on it) into the buffer
-    if (curPage == NULL){
-        status = bufMgr->readPage(filePtr, rid.pageNo, curPage);
-        if (status != OK){
-            return status;
-        }
-        curPageNo = rid.pageNo;
-        curDirtyFlag = false;
-        curRec = rid;
-        status = curPage->getRecord(rid, rec);
-        if (status != OK){
-            return status;
-        }
-        return status;
-    }
-    // If the desired record is on the currently pinned page
-    if (curPageNo == rid.pageNo){
-        // Call getRecord on current page (gets record by slot number)
-        status = curPage->getRecord(rid, rec);
-        if (status != OK){
-            return status;
-        }
-        // Update HeapFile object
-        curPageNo = rid.pageNo;
-        curRec = rid;
-    }
-    else{
-        // unpin the currently pinned page (assuming a page is pinned)
-        status = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
-        if (status != OK){
-            return status;
-        }
-        // Update HeapFile object
-        curPageNo = rid.pageNo;
-        curDirtyFlag = false;
-        curRec = rid;
-        // use the pageNo field of the RID to read the page into the buffer pool
-        status = bufMgr->readPage(filePtr, rid.pageNo, curPage);
-        if (status != OK){
-            return status;
-        }
-        status = curPage->getRecord(rid, rec);
-        if (status != OK){
-            return status;
-        }
-    }
-    return status;
+
     // cout<< "getRecord. record (" << rid.pageNo << "." << rid.slotNo << ")" << endl;
    
    
@@ -281,7 +231,18 @@ const Status HeapFileScan::resetScan()
     return OK;
 }
 
+//************************ working here **************************//
 
+/*
+Output: RID of next record to satisfy the predicate :)
+Input: 
+
+Method: Scan one file page at a time. 
+ - For each page, use the firstRecord() and nextRecord() methods of the Page class to get the 
+    rids of all the records on the page.
+ - Convert the rid to a pointer to the record data and invoke matchRec() to determine 
+   if record satisfies the filter associated with the scan. 
+*/
 const Status HeapFileScan::scanNext(RID& outRid)
 {
     Status 	status = OK;
@@ -290,7 +251,10 @@ const Status HeapFileScan::scanNext(RID& outRid)
     int 	nextPageNo;
     Record      rec;
 
-    
+    // PageNum = 
+    // matchRec()
+    // if valid page
+    // while (nextPageNo != 
 	
 	
 	
