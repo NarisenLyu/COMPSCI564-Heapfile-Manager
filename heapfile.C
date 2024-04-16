@@ -46,8 +46,8 @@ const Status createHeapFile(const string fileName)
             
         }
         // When you have done all this unpin both pages and mark them as dirty.
-        bufMgr->unPinPage(file, newPageNo, false); 
-        bufMgr->unPinPage(file, hdrPageNo, false); 
+        bufMgr->unPinPage(file, newPageNo, true); 
+        bufMgr->unPinPage(file, hdrPageNo, true); 
 		
 		// flush and close file
         bufMgr->flushFile(file);
@@ -499,7 +499,7 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
         //Set last page as current page
         status = bufMgr->readPage(filePtr,curPageNo,curPage);
         if (status != OK){
-            cout << "11111: "<<curPageNo<< " "<< status;
+            //cout << "11111: "<<curPageNo<< " "<< status;
             return status;
         }
     }
@@ -524,9 +524,9 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
             }
             newPage->init(newPageNo);
             //Unpin current page and update to new page
-            unpinstatus = bufMgr->unPinPage(filePtr, newPageNo, curDirtyFlag);
+            unpinstatus = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
             if (unpinstatus != OK){
-                cout << "unpin failed";
+                //cout << "unpin failed";
                 return unpinstatus;
             }
             //Call insertRecord on this new Page
@@ -538,13 +538,14 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
             //Update header page fields
             //TODO what to update??
             headerPage->pageCnt++;
-        headerPage->lastPage = newPageNo;
-        headerPage->recCnt++;
-        hdrDirtyFlag = true;
-        curPage = newPage;
-        curPageNo = newPageNo;
-        curDirtyFlag = true;
+            headerPage->lastPage = newPageNo;
+            headerPage->recCnt++;
+            hdrDirtyFlag = true;
+            curPage = newPage;
+            curPageNo = newPageNo;
+            curDirtyFlag = true;
             //cout << "New page allocated and record inserted";
+            return status;
         }
     }
     return status;
