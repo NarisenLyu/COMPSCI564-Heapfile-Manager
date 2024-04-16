@@ -56,7 +56,11 @@ const Status destroyHeapFile(const string fileName)
 	return (db.destroyFile (fileName));
 }
 
-// constructor opens the underlying file
+/**
+ * This constructor opens the underlying file
+ * @param fileName The name of the file to be opened
+ * @param returnStatus A reference to a Status variable
+*/
 HeapFile::HeapFile(const string & fileName, Status& returnStatus)
 {
     Status 	status;
@@ -67,17 +71,28 @@ HeapFile::HeapFile(const string & fileName, Status& returnStatus)
     // open the file and read in the header page and the first data page
     if ((status = db.openFile(fileName, filePtr)) == OK)
     {
+		// Next, it reads and pins the header page for the file in the buffer pool, 
+        // initializing the private data members headerPage, headerPageNo, and hdrDirtyFlag
+        int firstPageNo;
+        Page* firstPage;
+        //returns via firstPageNo
+        filePtr->getFirstPage(firstPageNo);
+        //returns page via firstPage
+		bufMgr->readPage(filePtr,firstPageNo,firstPage);
+		headerPage = (FileHdrPage *) firstPage;
+		headerPageNo = firstPageNo;
+        //TODO: is it false? 
+		hdrDirtyFlag = false;
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+		// Finally, read and pin the first page of the file into the buffer pool, 
+        // initializing the values of curPage, curPageNo, and curDirtyFlag appropriately. 
+        // Set curRec to NULLRID.
+        curPageNo = headerPage->firstPage;
+        bufMgr->readPage(filePtr,curPageNo,curPage);
+        curDirtyFlag = false;
+        curRec = NULLRID;
+        returnStatus = status;
+		return;
     }
     else
     {
@@ -134,7 +149,54 @@ const int HeapFile::getRecCnt() const
 const Status HeapFile::getRecord(const RID & rid, Record & rec)
 {
     Status status;
-
+    // check if curPage is NULL. 
+    // If yes, read the right page (the one with the requested record on it) into the buffer
+    if (curPage == NULL){
+        status = bufMgr->readPage(filePtr, rid.pageNo, curPage);
+        if (status != OK){
+            return status;
+        }
+        curPageNo = rid.pageNo;
+        curDirtyFlag = false;
+        curRec = rid;
+        status = curPage->getRecord(rid, rec);
+        if (status != OK){
+            return status;
+        }
+        return status;
+    }
+    // If the desired record is on the currently pinned page
+    if (curPageNo == rid.pageNo){
+        // Call getRecord on current page (gets record by slot number)
+        status = curPage->getRecord(rid, rec);
+        if (status != OK){
+            return status;
+        }
+        // Update HeapFile object
+        curPageNo = rid.pageNo;
+        curRec = rid;
+    }
+    else{
+        // unpin the currently pinned page (assuming a page is pinned)
+        status = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
+        if (status != OK){
+            return status;
+        }
+        // Update HeapFile object
+        curPageNo = rid.pageNo;
+        curDirtyFlag = false;
+        curRec = rid;
+        // use the pageNo field of the RID to read the page into the buffer pool
+        status = bufMgr->readPage(filePtr, rid.pageNo, curPage);
+        if (status != OK){
+            return status;
+        }
+        status = curPage->getRecord(rid, rec);
+        if (status != OK){
+            return status;
+        }
+    }
+    return status;
     // cout<< "getRecord. record (" << rid.pageNo << "." << rid.slotNo << ")" << endl;
    
    
@@ -387,18 +449,16 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
         return INVALIDRECLEN;
     }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+    //Valid current Page
+    if (curPage != NULL){
+        status = curPage->insertRecord(rec,outRid);
+        
+    }
+    //Invalid current Page
+    // check if curPage is null
+    if (curPage == NULL){
+
+    }
 }
 
 
