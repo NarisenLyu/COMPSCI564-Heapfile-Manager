@@ -491,14 +491,61 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
         return INVALIDRECLEN;
     }
 
-    //Valid current Page
-    if (curPage != NULL){
-        status = curPage->insertRecord(rec,outRid);
-        
-    }
     //Invalid current Page
     // check if curPage is null
     if (curPage == NULL){
-
+        //Read the last page (Use hdrPage->lastPage)
+        curPageNo = headerPage->lastPage;
+        //Set last page as current page
+        status = bufMgr->readPage(filePtr,curPageNo,curPage);
+        if (status != OK){
+            cout << "11111: "<<curPageNo<< " "<< status;
+            return status;
+        }
     }
+    //cout << "--------HERE--------";
+    //Valid current Page
+    if (curPage != NULL){
+        status = curPage->insertRecord(rec,outRid);
+        if (status == OK){
+            headerPage->recCnt++;
+            curRec = outRid;
+            hdrDirtyFlag = true;
+            curDirtyFlag = true;
+            //cout << "successfully inserted";
+            return status;
+        }
+        else{
+            //Allocate new page and initialize it
+            status = bufMgr->allocPage(filePtr, newPageNo, newPage);
+            if (status != OK){
+                //cout << "allocation failed";
+                return status;
+            }
+            newPage->init(newPageNo);
+            //Unpin current page and update to new page
+            unpinstatus = bufMgr->unPinPage(filePtr, newPageNo, curDirtyFlag);
+            if (unpinstatus != OK){
+                cout << "unpin failed";
+                return unpinstatus;
+            }
+            //Call insertRecord on this new Page
+            status = newPage->insertRecord(rec, outRid);
+            if (status != OK){
+                cout << "insertion failed";
+                return status;
+            }
+            //Update header page fields
+            //TODO what to update??
+            headerPage->pageCnt++;
+        headerPage->lastPage = newPageNo;
+        headerPage->recCnt++;
+        hdrDirtyFlag = true;
+        curPage = newPage;
+        curPageNo = newPageNo;
+        curDirtyFlag = true;
+            //cout << "New page allocated and record inserted";
+        }
+    }
+    return status;
 }
