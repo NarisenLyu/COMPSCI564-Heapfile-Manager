@@ -299,14 +299,14 @@ const Status HeapFileScan::resetScan()
 //****************************************************************//
 
 /*
+Scans through files looking for the next record to satisfy the predicate
 Output: RID of next record to satisfy the predicate :)
-Input:  
-
 Method: Scan one file page at a time. 
  - For each page, use the firstRecord() and nextRecord() methods of the Page class to get the 
     rids of all the records on the page.
  - Convert the rid to a pointer to the record data and invoke matchRec() to determine 
    if record satisfies the filter associated with the scan. 
+
 */
 const Status HeapFileScan::scanNext(RID& outRid)
 {
@@ -328,19 +328,43 @@ const Status HeapFileScan::scanNext(RID& outRid)
 
         // build Rec info
         status = curPage->firstRecord(tmpRid);
-        if (status != OK) return(status);
+        if (status != OK) { // there are no records
+            status = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
+            if (status != OK) return(status);
+            curPage = NULL;
+            curPageNo = -1;
+            curRec = tmpRid; // not sure about this line
+            return FILEEOF;
+        }
         curRec = tmpRid;
+        // have to then check this record.
+        getRecord(rec);
+        if(matchRec(rec)){
+            outRid = tmpRid;
+            return OK;
+        }
     }
+
     // loop through pages. 
     while (status == OK){
+        // get the most recently used record
         if (firstLoop){
             tmpRid = curRec;
             firstLoop = false;
         }
         else {
-            curPage->firstRecord(tmpRid);
+            status = curPage->firstRecord(tmpRid);
+            if (status != OK) return(status);
+            curRec = tmpRid;
+            // check this record.
+            getRecord(rec);
+            if(matchRec(rec)){
+                outRid = tmpRid;
+                return OK;
+            }
         }
-        while ((curPage->nextRecord(tmpRid, nextRid)) == OK){ //FIXME: 
+        // loops through records on a page.
+        while ((curPage->nextRecord(tmpRid, nextRid)) == OK){
             curRec = nextRid;
             getRecord(rec);
             if(matchRec(rec)){
@@ -352,9 +376,11 @@ const Status HeapFileScan::scanNext(RID& outRid)
         // outside of this loop means we are at the end of the page
 
         // get next page number
-        curPage->getNextPage(nextPageNo);
+        status = curPage->getNextPage(nextPageNo);
+        if (status != OK) return(status);
         // unpin current page.
-        bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
+        status = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
+        if (status != OK) return(status);
         if (nextPageNo == -1){ // end of file
             return (NORECORDS); //FIXME
         }
@@ -366,10 +392,7 @@ const Status HeapFileScan::scanNext(RID& outRid)
     }
     // broke out of this loop bc status is not OK
 	return status;
-	
-	
 }
-
 
 // returns pointer to the current record.  page is left pinned
 // and the scan logic is required to unpin the page 
@@ -393,7 +416,6 @@ const Status HeapFileScan::deleteRecord()
     hdrDirtyFlag = true; 
     return status;
 }
-
 
 // mark current page of scan dirty
 const Status HeapFileScan::markDirty()
