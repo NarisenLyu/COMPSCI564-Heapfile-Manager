@@ -168,9 +168,6 @@ const Status HeapFile::getRecord(const RID & rid, Record & rec)
         curDirtyFlag = false;
         curRec = rid;
         status = curPage->getRecord(rid, rec);
-        if (status != OK){
-            return status;
-        }
         return status;
     }
     // If the desired record is on the currently pinned page
@@ -181,8 +178,8 @@ const Status HeapFile::getRecord(const RID & rid, Record & rec)
             return status;
         }
         // Update HeapFile object
-        curPageNo = rid.pageNo;
         curRec = rid;
+        return status;
     }
     else{
         // unpin the currently pinned page (assuming a page is pinned)
@@ -191,6 +188,7 @@ const Status HeapFile::getRecord(const RID & rid, Record & rec)
             return status;
         }
         // Update HeapFile object
+        curPage = NULL;
         curPageNo = rid.pageNo;
         curDirtyFlag = false;
         curRec = rid;
