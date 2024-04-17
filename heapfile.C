@@ -526,10 +526,10 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
     //cout << "--------HERE--------";
     //Valid current Page
     if (curPage != NULL){
-        status = curPage->insertRecord(rec,outRid);
+        status = curPage->insertRecord(rec,rid);
         if (status == OK){
             headerPage->recCnt++;
-            curRec = outRid;
+            outRid = rid;
             hdrDirtyFlag = true;
             curDirtyFlag = true;
             //cout << "successfully inserted";
@@ -543,29 +543,33 @@ const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
                 return status;
             }
             newPage->init(newPageNo);
-            //Unpin current page and update to new page
-            unpinstatus = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
-            if (unpinstatus != OK){
-                //cout << "unpin failed";
-                return unpinstatus;
-            }
-            //Call insertRecord on this new Page
-            status = newPage->insertRecord(rec, outRid);
+            status = curPage->setNextPage(newPageNo);
             if (status != OK){
-                cout << "insertion failed";
                 return status;
             }
-            //Update header page fields
-            //TODO what to update??
-            headerPage->pageCnt++;
-            headerPage->lastPage = newPageNo;
-            headerPage->recCnt++;
-            hdrDirtyFlag = true;
+            //Unpin current page and update to new page
+            curDirtyFlag = true;
+            unpinstatus = bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
             curPage = newPage;
             curPageNo = newPageNo;
-            curDirtyFlag = true;
-            //cout << "New page allocated and record inserted";
-            return status;
+            curDirtyFlag = false;
+            //Call insertRecord on this new Page
+            status = curPage->insertRecord(rec, rid);
+            if (status == OK) {
+                outRid = rid;
+                curDirtyFlag = true;
+                headerPage->recCnt++;
+                //cout << "New page allocated and record inserted";
+                return OK;
+            } else {
+                //when error, unpin and reset
+                //cout << "insertion failed";
+                //TODO anything else to update??
+                bufMgr->unPinPage(filePtr, curPageNo, curDirtyFlag);
+                curPage = NULL;
+                curPageNo = -1;
+                return status;
+            }
         }
     }
     return status;
