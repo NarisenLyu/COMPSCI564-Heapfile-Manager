@@ -84,9 +84,17 @@ HeapFile::HeapFile(const string & fileName, Status& returnStatus)
         int firstPageNo;
         Page* firstPage;
         //returns via firstPageNo
-        filePtr->getFirstPage(firstPageNo);
+        status = filePtr->getFirstPage(firstPageNo);
+        if (status != OK){
+            returnStatus = status;
+            return;
+        }
         //returns page via firstPage
-		bufMgr->readPage(filePtr,firstPageNo,firstPage);
+		status = bufMgr->readPage(filePtr,firstPageNo,firstPage);
+        if (status != OK){
+            returnStatus = status;
+            return;
+        }
 		headerPage = (FileHdrPage *) firstPage;
 		headerPageNo = firstPageNo;
         //TODO: is it false? 
@@ -96,17 +104,19 @@ HeapFile::HeapFile(const string & fileName, Status& returnStatus)
         // initializing the values of curPage, curPageNo, and curDirtyFlag appropriately. 
         // Set curRec to NULLRID.
         curPageNo = headerPage->firstPage;
-        bufMgr->readPage(filePtr,curPageNo,curPage);
+        status = bufMgr->readPage(filePtr,curPageNo,curPage);
+        if (status != OK){
+            returnStatus = status;
+            return;
+        }
         curDirtyFlag = false;
         curRec = NULLRID;
         returnStatus = status;
-		return;
     }
     else
     {
     	cerr << "open of heap file failed\n";
 		returnStatus = status;
-		return;
     }
 }
 
