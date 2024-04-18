@@ -1,7 +1,18 @@
+/**
+ * @file heapfile.C
+ *
+ * @author Nixie Koch, nkkoch@wisc.edu
+ * @author Narisen Lyu, nlyu3@wisc.edu
+ */
+
 #include "heapfile.h"
 #include "error.h"
 
-// routine to create a heapfile
+/**
+ * routine to create a heapfile
+ * @param fileName The name of the file to be created
+ * @return status: An enum indicating the success or failure of the operation
+*/
 const Status createHeapFile(const string fileName)
 {
     File* 		file;
@@ -68,6 +79,7 @@ const Status destroyHeapFile(const string fileName)
  * This constructor opens the underlying file
  * @param fileName The name of the file to be opened
  * @param returnStatus A reference to a Status variable
+ * @return status via the returnStatus parameter and status
 */
 HeapFile::HeapFile(const string & fileName, Status& returnStatus)
 {
@@ -504,7 +516,12 @@ InsertFileScan::~InsertFileScan()
     }
 }
 
-// Insert a record into the file
+/**
+ * Insert a record into the file
+ * @param rec containing the data to be inserted into the file.
+ * @param outRID Reference to a RID object where the RID of the newly inserted record will be stored
+ * @return RID via the outRID parameter and status
+*/
 const Status InsertFileScan::insertRecord(const Record & rec, RID& outRid)
 {
     Page*	newPage;

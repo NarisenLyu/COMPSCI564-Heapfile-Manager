@@ -1,0 +1,2 @@
+Nixie Koch: worked on createHeapFile and scanNext
+Narisen Lyu: worked on HeapFile, getRecord, and insertRecord

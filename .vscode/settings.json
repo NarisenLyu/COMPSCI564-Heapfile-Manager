@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "heapfile.C": "cpp",
-        "page.C": "cpp",
-        "buf.C": "cpp"
-    }
-}
